@@ -12,9 +12,14 @@ namespace Antymology.Terrain
         #region Fields
 
         /// <summary>
-        /// The prefab containing the ant.
+        /// The ant prefab.
         /// </summary>
         public GameObject antPrefab;
+
+        /// <summary>
+        /// The queen prefab.
+        /// </summary>
+        public GameObject queenPrefab;
 
         /// <summary>
         /// The material used for eech block.
@@ -41,6 +46,15 @@ namespace Antymology.Terrain
         /// </summary>
         private SimplexNoise SimplexNoise;
 
+        /// <summary>
+        /// Ants currently alive.
+        /// </summary>
+        private List<GameObject> currentAnts;
+
+        /// <summary>
+        /// The ants parent element on the structure hierarchy.
+        /// </summary>
+        private Transform antsParentTransform;
         #endregion
 
         #region Initialization
@@ -67,6 +81,9 @@ namespace Antymology.Terrain
                 ConfigurationManager.Instance.World_Diameter,
                 ConfigurationManager.Instance.World_Height,
                 ConfigurationManager.Instance.World_Diameter];
+            
+            // Initialize the currentAnts list.
+            currentAnts = new List<GameObject>();
         }
 
         /// <summary>
@@ -74,26 +91,150 @@ namespace Antymology.Terrain
         /// </summary>
         private void Start()
         {
+            GameObject antsParentElement = new GameObject("Ants");
+            antsParentTransform = antsParentElement.GetComponent<Transform>();
+            // StartCoroutine(SimulationLoop());
+
             GenerateData();
             GenerateChunks();
 
-            Camera.main.transform.position = new Vector3(0 / 2, Blocks.GetLength(1), 0);
-            Camera.main.transform.LookAt(new Vector3(Blocks.GetLength(0), 0, Blocks.GetLength(2)));
+            CameraInitialSetup();
 
+            GenerateQueen();
             GenerateAnts();
         }
 
         /// <summary>
-        /// TO BE IMPLEMENTED BY YOU
+        /// Set's up the camera initial positioning and look at.
+        /// </summary>
+        private void CameraInitialSetup()
+        {
+            Camera.main.transform.position = new Vector3(0 / 2, Blocks.GetLength(1), 0);
+            Camera.main.transform.LookAt(new Vector3(Blocks.GetLength(0), 0, Blocks.GetLength(2)));
+        }
+
+        /// <summary>
+        /// Generating a queen ant.
+        /// </summary>
+        private void GenerateQueen()
+        {
+            // Instantiating the unique queen ant.
+            int xPosition = GetSpawnXPosition();
+            int zPosition = GetSpawnZPosition();
+            
+            // Loops in case position already has an ant.
+            while (HasAntAtPosition(xPosition, zPosition))
+            {
+                xPosition = GetSpawnXPosition();
+                zPosition = GetSpawnZPosition();
+            }
+
+            float yPosition = GetSpawnYPosition(xPosition, zPosition);
+
+            Vector3 spawnPosition = new Vector3((float) xPosition, yPosition, (float) zPosition);
+            GameObject createdQueen = GameObject.Instantiate(queenPrefab, spawnPosition, antPrefab.transform.rotation);
+            createdQueen.name = "Queen";
+            createdQueen.transform.SetParent(antsParentTransform);
+
+            currentAnts.Add(createdQueen);
+        }
+    
+        /// <summary>
+        /// Generating a non queen ant population.
         /// </summary>
         private void GenerateAnts()
         {
-            throw new NotImplementedException();
+            // Instantiating the initial ants.
+            for (int i = 0; i < ConfigurationManager.Instance.InitialPopulation; i++)
+            {
+                int xPosition = GetSpawnXPosition();
+                int zPosition = GetSpawnZPosition();
+
+                // Loops in case position already has an ant.
+                while (HasAntAtPosition(xPosition, zPosition))
+                {
+                    xPosition = GetSpawnXPosition();
+                    zPosition = GetSpawnZPosition();
+                }
+
+                float yPosition = GetSpawnYPosition(xPosition, zPosition);
+
+                Vector3 spawnPosition = new Vector3((float) xPosition, yPosition, (float) zPosition);
+                GameObject createdAnt = GameObject.Instantiate(antPrefab, spawnPosition, antPrefab.transform.rotation);
+                createdAnt.name = $"Ant {i}";
+                createdAnt.transform.SetParent(antsParentTransform);
+
+                currentAnts.Add(createdAnt);
+            }
         }
 
         #endregion
 
         #region Methods
+
+        /// <summary>
+        /// Get the X position an ant should spawn.
+        /// </summary>
+        private int GetSpawnXPosition()
+        {
+            int maxX = Blocks.GetLength(0) - 1;
+            int minX = 1;
+
+            return RNG.Next(minX, maxX);
+        }
+
+        /// <summary>
+        /// Get the Z position an ant should spawn.
+        /// </summary>
+        private int GetSpawnZPosition()
+        {
+            int maxZ = Blocks.GetLength(2) - 1;
+            int minZ = 1;
+
+            return RNG.Next(minZ, maxZ);
+        }
+
+        /// <summary>
+        /// Get the Y position an ant should spawn, based on the X and Z coordinates.
+        /// </summary>
+        private float GetSpawnYPosition(int xPosition, int zPosition)
+        {
+            int maxY = Blocks.GetLength(1) - 1;
+
+            for (int currentY = maxY; currentY >= 0; currentY--)
+            {
+                AbstractBlock currentBlock = GetBlock(xPosition, currentY, zPosition);
+                bool isAir = currentBlock is AirBlock;
+                
+                if(!isAir)
+                {
+                    // The ant has a smaller scale, so this is used so that it won't look as it was levitating.
+                    float yPositionOffset = 0.2f;
+                    float yPosition = (float) currentY + 1.0f;
+                    return yPosition - yPositionOffset;
+                }
+            }
+
+            return -1;
+        }
+
+        /// <summary>
+        /// Used to check if the spawning spot already has an ant.
+        /// </summary>
+        private bool HasAntAtPosition(int xPosition, int zPosition)
+        {
+            foreach (GameObject ant in currentAnts)
+            {
+                bool zOccupied = ant.transform.position.x == (float) xPosition;
+                bool xOccupied = ant.transform.position.z == (float) zPosition;
+                bool positionOccupied = xOccupied && zOccupied;
+
+                if (positionOccupied)
+                    return true;
+            }
+
+            return false;
+        }
 
         /// <summary>
         /// Retrieves an abstract block type at the desired world coordinates.

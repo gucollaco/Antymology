@@ -8,8 +8,17 @@ namespace Antymology.Terrain
 {
     public class WorldManager : Singleton<WorldManager>
     {
-
         #region Fields
+
+        /// <summary>
+        /// Currently alive ants.
+        /// </summary>
+        public List<GameObject> currentAnts;
+
+        /// <summary>
+        /// Current queen.
+        /// </summary>
+        public GameObject currentQueen;
 
         /// <summary>
         /// The ant prefab.
@@ -47,14 +56,29 @@ namespace Antymology.Terrain
         private SimplexNoise SimplexNoise;
 
         /// <summary>
-        /// Ants currently alive.
-        /// </summary>
-        private List<GameObject> currentAnts;
-
-        /// <summary>
         /// The ants parent element on the structure hierarchy.
         /// </summary>
         private Transform antsParentTransform;
+
+        /// <summary>
+        /// Value to wait after the creation has happened.
+        /// </summary>
+        private float postCreationWaitValue = 3.0f;
+
+        /// <summary>
+        /// Value to wait between each ant action.
+        /// </summary>
+        private float actionWaitValue = 1.0f;
+
+        /// <summary>
+        /// Wait after the creation has happened.
+        /// </summary>
+        private WaitForSeconds postCreationWait;
+
+        /// <summary>
+        /// Wait between each ant action.
+        /// </summary>
+        private WaitForSeconds actionWait;
         #endregion
 
         #region Initialization
@@ -93,15 +117,63 @@ namespace Antymology.Terrain
         {
             GameObject antsParentElement = new GameObject("Ants");
             antsParentTransform = antsParentElement.GetComponent<Transform>();
-            // StartCoroutine(SimulationLoop());
+            
+            postCreationWait = new WaitForSeconds(postCreationWaitValue);
+            actionWait = new WaitForSeconds(actionWaitValue);
 
+            StartCoroutine(SimulationLoop());
+        }
+
+        /// <summary>
+        /// The simulation loop routine.
+        /// </summary>
+        private IEnumerator SimulationLoop()
+        {
+            yield return StartCoroutine(GenerationCreation());
+            yield return StartCoroutine(GenerationLiving());
+
+            StartCoroutine(SimulationLoop());
+        }
+
+        /// <summary>
+        /// The section which creates the generation elements.
+        /// </summary>
+        private IEnumerator GenerationCreation()
+        {
             GenerateData();
             GenerateChunks();
-
-            CameraInitialSetup();
-
             GenerateQueen();
             GenerateAnts();
+            CameraInitialSetup();
+
+            yield return postCreationWait;
+        }
+
+        /// <summary>
+        /// The section which simulates the ant generation living their lives.
+        /// </summary>
+        private IEnumerator GenerationLiving()
+        {
+            while(true)
+            {
+                AntsChooseAction();
+                yield return actionWait;
+            }
+        }
+
+        /// <summary>
+        /// Each ant chooses the action to take (the queen also takes her action).
+        /// </summary>
+        private void AntsChooseAction()
+        {
+            Queen queenScript = currentQueen.GetComponent<Queen>();
+            queenScript.ChooseAction();
+
+            foreach (GameObject ant in currentAnts)
+            {
+                Ant antScript = ant.GetComponent<Ant>();
+                antScript.ChooseAction();
+            }
         }
 
         /// <summary>
@@ -132,11 +204,9 @@ namespace Antymology.Terrain
             float yPosition = GetSpawnYPosition(xPosition, zPosition);
 
             Vector3 spawnPosition = new Vector3((float) xPosition, yPosition, (float) zPosition);
-            GameObject createdQueen = GameObject.Instantiate(queenPrefab, spawnPosition, antPrefab.transform.rotation);
-            createdQueen.name = "Queen";
-            createdQueen.transform.SetParent(antsParentTransform);
-
-            currentAnts.Add(createdQueen);
+            currentQueen = GameObject.Instantiate(queenPrefab, spawnPosition, antPrefab.transform.rotation);
+            currentQueen.name = "Queen";
+            currentQueen.transform.SetParent(antsParentTransform);
         }
     
         /// <summary>
@@ -197,7 +267,7 @@ namespace Antymology.Terrain
         /// <summary>
         /// Get the Y position an ant should spawn, based on the X and Z coordinates.
         /// </summary>
-        private float GetSpawnYPosition(int xPosition, int zPosition)
+        public float GetSpawnYPosition(int xPosition, int zPosition)
         {
             int maxY = Blocks.GetLength(1) - 1;
 
@@ -208,10 +278,8 @@ namespace Antymology.Terrain
                 
                 if(!isAir)
                 {
-                    // The ant has a smaller scale, so this is used so that it won't look as it was levitating.
-                    float yPositionOffset = 0.2f;
                     float yPosition = (float) currentY + 1.0f;
-                    return yPosition - yPositionOffset;
+                    return yPosition;
                 }
             }
 

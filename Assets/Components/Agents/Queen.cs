@@ -3,30 +3,10 @@ using System.Collections.Generic;
 using UnityEngine;
 using Antymology.Terrain;
 
-public enum BlockType
-{
-    Abstract = 0,
-    Acid = 1,
-    Air = 2,
-    Container = 3,
-    Grass = 4,
-    Mulch = 5,
-    Nest = 6,
-    Stone = 7,
-}
-
-public enum MoveDirections
-{
-    Forward = 0,
-    Right = 1,
-    Backward = 2,
-    Left = 3,
-}
-
-public class Ant : MonoBehaviour
+public class Queen : MonoBehaviour
 {
     public int health;
-    public int maxHealth = 200;
+    public int maxHealth = 500;
     public int totalGivenHealth = 0;
     public int totalReceivedHealth = 0;
 
@@ -61,36 +41,29 @@ public class Ant : MonoBehaviour
     /// </summary>
     public void ChooseAction()
     {
-        ClearDirectionArrays();
+        // ClearDirectionArrays();
 
-        Vector3 belowBlockPosition = GetBelowBlockPosition();
-        AbstractBlock belowBlock = WorldManager.Instance.GetBlock((int) belowBlockPosition.x, (int) belowBlockPosition.y, (int) belowBlockPosition.z);
-        BlockType belowBlockType = GetBlockType(belowBlock);
+        // Vector3 belowBlockPosition = GetBelowBlockPosition();
+        // AbstractBlock belowBlock = WorldManager.Instance.GetBlock((int) belowBlockPosition.x, (int) belowBlockPosition.y, (int) belowBlockPosition.z);
+        // BlockType belowBlockType = GetBelowBlockType(belowBlock);
 
-        // Get the element with the lowest health compared to the total.
-        GameObject lowestHealthObject = WorldManager.Instance.currentQueen;
-        float lowestHealth = lowestHealthObject.GetComponent<Queen>().health / lowestHealthObject.GetComponent<Queen>().maxHealth;
+        // // Get the ant with the lowest health compared to the total.
+        // GameObject lowestHealthObject = null;
+        // float lowestHealth = 10000;
         
-        foreach (GameObject antObject in WorldManager.Instance.currentAnts)
-        {
-            Ant ant = antObject.GetComponent<Ant>();
+        // foreach (GameObject antObject in WorldManager.Instance.currentAnts)
+        // {
+        //     Ant ant = antObject.GetComponent<Ant>();
 
-            float currentAntHealth = ant.health / ant.maxHealth;
-            if (currentAntHealth < lowestHealth)
-            {
-                lowestHealthObject = antObject;
-                lowestHealth = currentAntHealth;
-            }
-        }
+        //     float currentAntHealth = ant.health / ant.maxHealth;
+        //     if (currentAntHealth < lowestHealth)
+        //     {
+        //         lowestHealthObject = antObject;
+        //         lowestHealth = currentAntHealth;
+        //     }
+        // }
 
-        // If the element is the one with lowest health, go to the queen.
-        if (gameObject.name == lowestHealthObject.gameObject.name)
-        {
-            lowestHealthObject = WorldManager.Instance.currentQueen;
-            lowestHealth = lowestHealthObject.GetComponent<Queen>().health / lowestHealthObject.GetComponent<Queen>().maxHealth;
-        }
-
-        MoveToTarget(lowestHealthObject);
+        // MoveToTarget(lowestHealthObject);
         UpdateHealth();
 
         turn++;
@@ -151,91 +124,63 @@ public class Ant : MonoBehaviour
         float zDistance = targetObject.gameObject.transform.position.z - gameObject.transform.position.z;
         float zUpdate = zDistance >= 0 ? 1 : -1;
 
-        if (xDistance == 0)
-            MoveTowardsZ(zUpdate);
-        else if (zDistance == 0)
-            MoveTowardsX(xUpdate);
+        float currentHeight = GetPositionHeight(transform.position.x, transform.position.z);
+        if (xDistance > zDistance)
+        {
+            float targetHeight = GetPositionHeight(transform.position.x + xUpdate, transform.position.z);
+            float heightDifference = targetHeight - currentHeight;
+
+            if (heightDifference == 1.0f)
+                transform.position = transform.position + new Vector3(xUpdate, 1.0f, 0);
+            else if (heightDifference == -1.0f)
+                transform.position = transform.position + new Vector3(xUpdate, -1.0f, 0);
+            else if (heightDifference == 0.0f)
+                transform.position = transform.position + new Vector3(xUpdate, 0, 0);
+            else if (heightDifference >= 2.0f)
+            {
+                // Should place a stone block on the current position.
+                AbstractBlock block = new StoneBlock();
+                Vector3 oldPosition = transform.position;
+                transform.position = transform.position + new Vector3(0, 1.0f, 0);
+                PlaceBlock(oldPosition.x, oldPosition.y, oldPosition.z, block);
+            }
+            else if (heightDifference <= -2.0f)
+            {
+                // Should remove the below block, by replacing it with an air block.
+                AbstractBlock block = new AirBlock();
+                PlaceBlock(transform.position.x, transform.position.y - 1.0f, transform.position.z, block);
+                transform.position = transform.position + new Vector3(0, -1.0f, 0);
+            }
+        }
         else
         {
-            // randomize if should go through X or Z on this step
-            float rand = Random.Range(0, 2);
+            float targetHeight = GetPositionHeight(transform.position.x, transform.position.z + zUpdate);
+            float heightDifference = targetHeight - currentHeight;
 
-            if (rand == 0)
-                MoveTowardsX(xUpdate);
-            else
-                MoveTowardsZ(zUpdate);
+            if (heightDifference == 1.0f)
+                transform.position = transform.position + new Vector3(0, 1.0f, zUpdate);
+            else if (heightDifference == -1.0f)
+                transform.position = transform.position + new Vector3(0, -1.0f, zUpdate);
+            else if (heightDifference == 0.0f)
+                transform.position = transform.position + new Vector3(0, 0, zUpdate);
+            else if (heightDifference >= 2.0f)
+            {
+                // Should place a stone block on the current position.
+                AbstractBlock block = new StoneBlock();
+                Vector3 oldPosition = transform.position;
+                transform.position = transform.position + new Vector3(0, 1.0f, 0);
+                PlaceBlock(oldPosition.x, oldPosition.y, oldPosition.z, block);
+            }
+            else if (heightDifference <= -2.0f)
+            {
+                // Should remove the below block, by replacing it with an air block.
+                AbstractBlock block = new AirBlock();
+                PlaceBlock(transform.position.x, transform.position.y - 1.0f, transform.position.z, block);
+                transform.position = transform.position + new Vector3(0, -1.0f, 0);
+            }
         }
     }
 
-    /// <summary>
-    /// Method to move towards the target through X.
-    /// </summary>
-    public void MoveTowardsX(float xUpdate)
-    {
-        float currentHeight = GetPositionHeight(transform.position.x, transform.position.z);
-        float targetHeight = GetPositionHeight(transform.position.x + xUpdate, transform.position.z);
-        float heightDifference = targetHeight - currentHeight;
-
-        if (heightDifference == 1.0f)
-            transform.position = transform.position + new Vector3(xUpdate, 1.0f, 0);
-        else if (heightDifference == -1.0f)
-            transform.position = transform.position + new Vector3(xUpdate, -1.0f, 0);
-        else if (heightDifference == 0.0f)
-            transform.position = transform.position + new Vector3(xUpdate, 0, 0);
-        else if (heightDifference >= 2.0f)
-            Climb();
-        else if (heightDifference <= -2.0f)
-            Dig();
-    }
-
-    /// <summary>
-    /// Method to move towards the target through Z.
-    /// </summary>
-    public void MoveTowardsZ(float zUpdate)
-    {
-        float currentHeight = GetPositionHeight(transform.position.x, transform.position.z);
-        float targetHeight = GetPositionHeight(transform.position.x, transform.position.z + zUpdate);
-        float heightDifference = targetHeight - currentHeight;
-
-        if (heightDifference == 1.0f)
-            transform.position = transform.position + new Vector3(0, 1.0f, zUpdate);
-        else if (heightDifference == -1.0f)
-            transform.position = transform.position + new Vector3(0, -1.0f, zUpdate);
-        else if (heightDifference == 0.0f)
-            transform.position = transform.position + new Vector3(0, 0, zUpdate);
-        else if (heightDifference >= 2.0f)
-            Climb();
-        else if (heightDifference <= -2.0f)
-            Dig();
-    }
-
-    /// <summary>
-    /// Climbing a placed block.
-    /// </summary>
-    public void Climb()
-    {
-        // Should place a stone block on the current position.
-        AbstractBlock block = new StoneBlock();
-        Vector3 oldPosition = transform.position;
-        transform.position = transform.position + new Vector3(0, 1.0f, 0);
-        PlaceBlock(oldPosition.x, oldPosition.y, oldPosition.z, block);
-    }
-    
-    /// <summary>
-    /// Digging on the current position.
-    /// </summary>
-    public void Dig()
-    {
-        BlockType belowBlockType = GetBelowBlockType();
-        if (belowBlockType != BlockType.Container)
-        {
-            // Should remove the below block, by replacing it with an air block.
-            AbstractBlock block = new AirBlock();
-            PlaceBlock(transform.position.x, transform.position.y - 1.0f, transform.position.z, block);
-            transform.position = transform.position + new Vector3(0, -1.0f, 0);
-        }
-    }
-    
     /// <summary>
     /// Getting the height when moving to another position.
     /// </summary>
@@ -246,6 +191,14 @@ public class Ant : MonoBehaviour
         return yPosition - 1.0f;
     }
     
+    /// <summary>
+    /// Function to simulate a dig.
+    /// </summary>
+    private void Dig(int x, int y, int z, AbstractBlock block)
+    {
+        // WorldManager.Instance.SetBlock(x, y, z, block);
+    }
+
     /// <summary>
     /// Function to place a block at a given coordinate.
     /// </summary>
@@ -308,20 +261,9 @@ public class Ant : MonoBehaviour
     }
 
     /// <summary>
-    /// Method to get the below block's type.
-    /// </summary>
-    private BlockType GetBelowBlockType()
-    {
-        Vector3 belowBlockPosition = GetBelowBlockPosition();
-        AbstractBlock belowBlock = WorldManager.Instance.GetBlock((int) belowBlockPosition.x, (int) belowBlockPosition.y, (int) belowBlockPosition.z);
-        BlockType belowBlockType = GetBlockType(belowBlock);
-        return belowBlockType;
-    }
-
-    /// <summary>
     /// Method to get the block's type.
     /// </summary>
-    private BlockType GetBlockType(AbstractBlock block)
+    private BlockType GetBelowBlockType(AbstractBlock block)
     {
         if (block is AcidicBlock)
             return BlockType.Acid;

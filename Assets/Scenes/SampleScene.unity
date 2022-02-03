@@ -197,7 +197,7 @@ Light:
   m_BounceIntensity: 1
   m_ColorTemperature: 6570
   m_UseColorTemperature: 0
-  m_BoundingSphereOverride: {x: 0, y: 1e-45, z: 8.024e-42, w: 6e-44}
+  m_BoundingSphereOverride: {x: 0, y: 0, z: 0, w: 0}
   m_UseBoundingSphereOverride: 0
   m_UseViewFrustumForShadowCasterCull: 1
   m_ShadowRadius: 0
@@ -359,6 +359,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fbd0fdbaf66dc1a4488d999aa299645f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  currentAnts: []
+  currentQueen: {fileID: 0}
   antPrefab: {fileID: 8793662304496693351, guid: a6a8e8526b124ea5891e038c6bca8c44,
     type: 3}
   queenPrefab: {fileID: 1407372792205191204, guid: 8f6668340329d0449a717b773fbf680a,
@@ -399,7 +401,7 @@ MonoBehaviour:
   Acidic_Region_Radius: 5
   Number_Of_Conatiner_Spheres: 5
   Conatiner_Sphere_Radius: 10
-  InitialPopulation: 50
+  InitialPopulation: 5
 --- !u!850595691 &1337172883
 LightingSettings:
   m_ObjectHideFlags: 0

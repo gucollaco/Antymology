@@ -26,34 +26,24 @@ public enum MoveDirections
 public class Ant : MonoBehaviour
 {
     public int health;
-    public int maxHealth = 200;
+    public int initialHealth = 250;
+    public int maxHealth = 350;
     public int totalGivenHealth = 0;
     public int totalReceivedHealth = 0;
+    public int totalMulchRecoveredHealth = 0;
 
-    private int maxHealthOffset = 20;
+    private int initialHealthOffset = 20;
     private int mulchHealthRecovery = 30;
-    private int maxDamage = 1;
+    private int turnDamage = 5;
     private System.Random RNG;
-    private List<MoveDirections> possibleDirections;
-    private List<float> possibleDirectionsHeightUpdate;
-    private int turn = 0;
     
-    // Start is called before the first frame update
     void Start()
     {
         // Generate new random number generator
         RNG = new System.Random(ConfigurationManager.Instance.Seed);
         
         // Randomize initial health
-        health = maxHealth - Random.Range(0, maxHealthOffset + 1);
-
-        possibleDirections = new List<MoveDirections>();
-        possibleDirectionsHeightUpdate = new List<float>();
-    }
-
-    // Update is called once per frame
-    void Update()
-    {
+        health = initialHealth - Random.Range(0, initialHealthOffset + 1);
     }
 
     /// <summary>
@@ -61,8 +51,6 @@ public class Ant : MonoBehaviour
     /// </summary>
     public void ChooseAction()
     {
-        ClearDirectionArrays();
-
         Vector3 belowBlockPosition = GetBelowBlockPosition();
         AbstractBlock belowBlock = WorldManager.Instance.GetBlock((int) belowBlockPosition.x, (int) belowBlockPosition.y, (int) belowBlockPosition.z);
         BlockType belowBlockType = GetBlockType(belowBlock);
@@ -90,55 +78,45 @@ public class Ant : MonoBehaviour
             lowestHealth = lowestHealthObject.GetComponent<Queen>().health / lowestHealthObject.GetComponent<Queen>().maxHealth;
         }
 
-        MoveToTarget(lowestHealthObject);
-        UpdateHealth();
+        // If below block is of type Mulch, and the current health is less than (maxHealth - mulchHealthRecovery)
+        // we have a 60% chance that the ant will dig and feed from it.
+        if (belowBlockType == BlockType.Mulch && health < (maxHealth - mulchHealthRecovery))
+        {
+            float rand = Random.Range(0, 5);
+            
+            if (rand <= 2)
+                Dig();
+            else
+                MoveToTarget(lowestHealthObject);
+        }
+        else
+            MoveToTarget(lowestHealthObject);
 
-        turn++;
+        UpdateHealth(belowBlockType);
+    }
 
-        // float moveLeftHeight = GetMoveHeight((int) transform.position.x - 1, (int) transform.position.y);
-        // bool canMoveLeft = moveLeftHeight <= 1;
-
-        // float moveRightHeight = GetMoveHeight((int) transform.position.x + 1, (int) transform.position.y);
-        // bool canMoveRight = moveRightHeight <= 1;
-    
-        // float moveBackwardHeight = GetMoveHeight((int) transform.position.x, (int) transform.position.y - 1);
-        // bool canMoveBackward = moveBackwardHeight <= 1;
-    
-        // float moveForwardHeight = GetMoveHeight((int) transform.position.x, (int) transform.position.y + 1);
-        // bool canMoveForward = moveForwardHeight <= 1;
-
-        // if(canMoveLeft)
-        // {
-        //     possibleDirections.Add(MoveDirections.Left);
-        //     possibleDirectionsHeightUpdate.Add(moveLeftHeight);
-        // }
-        // if(canMoveRight)
-        // {
-        //     possibleDirections.Add(MoveDirections.Right);
-        //     possibleDirectionsHeightUpdate.Add(moveRightHeight);
-        // }
-        // if(canMoveBackward)
-        // {
-        //     possibleDirections.Add(MoveDirections.Backward);
-        //     possibleDirectionsHeightUpdate.Add(moveBackwardHeight);
-        // }
-        // if(canMoveForward)
-        // {
-        //     possibleDirections.Add(MoveDirections.Forward);
-        //     possibleDirectionsHeightUpdate.Add(moveForwardHeight);
-        // }
-
-        // int chosenDirectionIndex = RNG.Next(possibleDirections.Count);
-        
-        // MoveTo(chosenDirectionIndex);
+    /// <summary>
+    /// Detecting collision.
+    /// </summary>
+    private void OnCollisionEnter(Collision other)
+    {
+        Debug.Log(gameObject.name);
+        Debug.Log("COLLIDED WITH");
+        Debug.Log(other.gameObject.name);
     }
 
     /// <summary>
     /// Method to update the ant's health per turn.
     /// </summary>
-    public void UpdateHealth()
+    public void UpdateHealth(BlockType belowBlockType)
     {
-        health -= maxDamage;
+        health -= turnDamage;
+
+        if (belowBlockType == BlockType.Acid)
+            health -= turnDamage;
+
+        if (health <= 0)
+            gameObject.SetActive(false);
     }
 
     /// <summary>
@@ -215,7 +193,7 @@ public class Ant : MonoBehaviour
     public void Climb()
     {
         // Should place a stone block on the current position.
-        AbstractBlock block = new StoneBlock();
+        AbstractBlock block = new MulchBlock();
         Vector3 oldPosition = transform.position;
         transform.position = transform.position + new Vector3(0, 1.0f, 0);
         PlaceBlock(oldPosition.x, oldPosition.y, oldPosition.z, block);
@@ -233,6 +211,18 @@ public class Ant : MonoBehaviour
             AbstractBlock block = new AirBlock();
             PlaceBlock(transform.position.x, transform.position.y - 1.0f, transform.position.z, block);
             transform.position = transform.position + new Vector3(0, -1.0f, 0);
+        }
+        // Recovers health when digging mulch.
+        if (belowBlockType == BlockType.Mulch)
+        {
+            health += mulchHealthRecovery;
+            totalMulchRecoveredHealth += mulchHealthRecovery;
+            // There is still a chance of eating when not needed.
+            if (health > maxHealth)
+            {
+                health = maxHealth;
+                totalMulchRecoveredHealth -= (health - maxHealth);
+            }
         }
     }
     
@@ -255,15 +245,6 @@ public class Ant : MonoBehaviour
     }
 
     /// <summary>
-    /// Clear the move direction related arrays.
-    /// </summary>
-    public void ClearDirectionArrays()
-    {
-        possibleDirections.Clear();
-        possibleDirectionsHeightUpdate.Clear();
-    }
-
-    /// <summary>
     /// Getting the height when moving to another position.
     /// </summary>
     public float GetMoveHeight(int xPosition, int zPosition)
@@ -273,24 +254,6 @@ public class Ant : MonoBehaviour
         return Mathf.Abs(transform.position.y - yPosition);
     }
     
-    /// <summary>
-    /// Method to move to a direction.
-    /// </summary>
-    public void MoveTo(int chosenDirectionIndex)
-    {
-        MoveDirections chosenDirection = possibleDirections[chosenDirectionIndex];
-        float yPositionUpdate = possibleDirectionsHeightUpdate[chosenDirectionIndex];
-
-        if (chosenDirection == MoveDirections.Left)
-            transform.position = GetPosition() + new Vector3(-1, yPositionUpdate, 0);
-        else if (chosenDirection == MoveDirections.Right)
-            transform.position = GetPosition() + new Vector3(1, yPositionUpdate, 0);
-        else if (chosenDirection == MoveDirections.Backward)
-            transform.position = GetPosition() + new Vector3(0, yPositionUpdate, -1);
-        else if (chosenDirection == MoveDirections.Forward)
-            transform.position = GetPosition() + new Vector3(0, yPositionUpdate, 1);
-    }
-
     /// <summary>
     /// Method to get the ant's current position.
     /// </summary>
@@ -330,6 +293,8 @@ public class Ant : MonoBehaviour
         else if (block is ContainerBlock)
             return BlockType.Container;
         else if (block is GrassBlock)
+            return BlockType.Grass;
+        else if (block is MulchBlock)
             return BlockType.Mulch;
         else if (block is NestBlock)
             return BlockType.Nest;

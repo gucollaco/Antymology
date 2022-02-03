@@ -11,6 +11,11 @@ namespace Antymology.Terrain
         #region Fields
 
         /// <summary>
+        /// The turn the current generation is at.
+        /// </summary>
+        public int turn;
+
+        /// <summary>
         /// Currently alive ants.
         /// </summary>
         public List<GameObject> currentAnts;
@@ -79,6 +84,7 @@ namespace Antymology.Terrain
         /// Wait between each ant action.
         /// </summary>
         private WaitForSeconds actionWait;
+
         #endregion
 
         #region Initialization
@@ -108,6 +114,9 @@ namespace Antymology.Terrain
             
             // Initialize the currentAnts list.
             currentAnts = new List<GameObject>();
+
+            // Sets the turn to 0.
+            turn = 0;
         }
 
         /// <summary>
@@ -156,6 +165,7 @@ namespace Antymology.Terrain
         {
             while(true)
             {
+                turn++;
                 AntsChooseAction();
                 yield return actionWait;
             }

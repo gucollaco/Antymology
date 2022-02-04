@@ -6,112 +6,188 @@ using Antymology.Terrain;
 public class Queen : MonoBehaviour
 {
     public int health;
-    public int maxHealth = 500;
+    public int initialHealth = 500;
+    public int maxHealth = 700;
     public int totalGivenHealth = 0;
     public int totalReceivedHealth = 0;
+    public int totalMulchRecoveredHealth = 0;
+    public int awaitTurns = 0;
+    public bool anotherOnSamePosition = false;
+    public int nestsProduced = 0;
 
-    private int maxHealthOffset = 20;
     private int mulchHealthRecovery = 30;
-    private int maxDamage = 1;
+    private int turnDamage = 5;
     private System.Random RNG;
-    private List<MoveDirections> possibleDirections;
-    private List<float> possibleDirectionsHeightUpdate;
-    private int turn = 0;
     
-    // Start is called before the first frame update
+    /// <summary>
+    /// Start is called before the first frame update
+    /// </summary>
     void Start()
     {
         // Generate new random number generator
         RNG = new System.Random(ConfigurationManager.Instance.Seed);
         
-        // Randomize initial health
-        health = maxHealth - Random.Range(0, maxHealthOffset + 1);
-
-        possibleDirections = new List<MoveDirections>();
-        possibleDirectionsHeightUpdate = new List<float>();
-    }
-
-    // Update is called once per frame
-    void Update()
-    {
+        // Setting initial health
+        health = initialHealth;
     }
 
     /// <summary>
-    /// Method to choose the ant's next action.
+    /// Method to choose the queen's next action.
     /// </summary>
-    public void ChooseAction()
+    public void ChooseAction(GameObject lowestHealthAnt)
     {
-        // ClearDirectionArrays();
+        BlockType belowBlockType = GetBelowBlockType();
 
-        // Vector3 belowBlockPosition = GetBelowBlockPosition();
-        // AbstractBlock belowBlock = WorldManager.Instance.GetBlock((int) belowBlockPosition.x, (int) belowBlockPosition.y, (int) belowBlockPosition.z);
-        // BlockType belowBlockType = GetBelowBlockType(belowBlock);
+        Action(belowBlockType, lowestHealthAnt);
+        UpdateHealth(belowBlockType);
+        UpdateAwaitTurns();
+    }
 
-        // // Get the ant with the lowest health compared to the total.
-        // GameObject lowestHealthObject = null;
-        // float lowestHealth = 10000;
-        
-        // foreach (GameObject antObject in WorldManager.Instance.currentAnts)
-        // {
-        //     Ant ant = antObject.GetComponent<Ant>();
+    /// <summary>
+    /// Will decide which action the queen should take.
+    /// </summary>
+    private void Action(BlockType belowBlockType, GameObject lowestHealthAnt)
+    {
+        bool isMultipleOfHundred = WorldManager.Instance.turn % 100 == 0;
 
-        //     float currentAntHealth = ant.health / ant.maxHealth;
-        //     if (currentAntHealth < lowestHealth)
-        //     {
-        //         lowestHealthObject = antObject;
-        //         lowestHealth = currentAntHealth;
-        //     }
-        // }
+        // If 100 turns have passed, the queen produces a nest.
+        if (isMultipleOfHundred)
+            ProduceNest();
+        // If haven't shared health recently, will move to the target.
+        else if (awaitTurns == 0)
+        {
+            DecideMove(belowBlockType, lowestHealthAnt);
+            CheckPosition();
+        }
+        // If not, will move randomly.
+        else
+            MoveRandomly();
+    }
 
-        // MoveToTarget(lowestHealthObject);
-        UpdateHealth();
+    /// <summary>
+    /// To a random direction.
+    /// </summary>
+    private void ProduceNest()
+    {
+        // Should place a nest block on the current position.
+        AbstractBlock block = new NestBlock();
+        Vector3 oldPosition = transform.position;
+        transform.position = transform.position + new Vector3(0, 1.0f, 0);
+        PlaceBlock(oldPosition.x, oldPosition.y, oldPosition.z, block);
 
-        turn++;
+        // Loses one third of the current health.
+        float oneThirdOfHealth = health / 3;
+        health -= (int) Mathf.Round(oneThirdOfHealth);
 
-        // float moveLeftHeight = GetMoveHeight((int) transform.position.x - 1, (int) transform.position.y);
-        // bool canMoveLeft = moveLeftHeight <= 1;
+        // Increases the quantity of produced nests.
+        nestsProduced++;
+    }
 
-        // float moveRightHeight = GetMoveHeight((int) transform.position.x + 1, (int) transform.position.y);
-        // bool canMoveRight = moveRightHeight <= 1;
-    
-        // float moveBackwardHeight = GetMoveHeight((int) transform.position.x, (int) transform.position.y - 1);
-        // bool canMoveBackward = moveBackwardHeight <= 1;
-    
-        // float moveForwardHeight = GetMoveHeight((int) transform.position.x, (int) transform.position.y + 1);
-        // bool canMoveForward = moveForwardHeight <= 1;
+    /// <summary>
+    /// To a random direction.
+    /// </summary>
+    private void MoveRandomly()
+    {
+        BlockType belowBlockType = GetBelowBlockType();
+        DecideRandomMove(belowBlockType);
+    }
 
-        // if(canMoveLeft)
-        // {
-        //     possibleDirections.Add(MoveDirections.Left);
-        //     possibleDirectionsHeightUpdate.Add(moveLeftHeight);
-        // }
-        // if(canMoveRight)
-        // {
-        //     possibleDirections.Add(MoveDirections.Right);
-        //     possibleDirectionsHeightUpdate.Add(moveRightHeight);
-        // }
-        // if(canMoveBackward)
-        // {
-        //     possibleDirections.Add(MoveDirections.Backward);
-        //     possibleDirectionsHeightUpdate.Add(moveBackwardHeight);
-        // }
-        // if(canMoveForward)
-        // {
-        //     possibleDirections.Add(MoveDirections.Forward);
-        //     possibleDirectionsHeightUpdate.Add(moveForwardHeight);
-        // }
+    /// <summary>
+    /// Decide which random move to take.
+    /// </summary>
+    private void DecideRandomMove(BlockType belowBlockType)
+    {
+        // Decide randomly which axis to travel through.
+        float randomAxis = Random.value;
 
-        // int chosenDirectionIndex = RNG.Next(possibleDirections.Count);
-        
-        // MoveTo(chosenDirectionIndex);
+        // Decide randomly which direction (forward or backward) to go to in that axis.
+        float randomDirection = Random.value;
+        int directionUpdate = randomDirection > 0.5f ? 1 : -1;
+
+        if (randomAxis < 0.5f)
+            MoveTowardsZ(directionUpdate);
+        else
+            MoveTowardsX(directionUpdate);
+    }
+
+    /// <summary>
+    /// Decide which move to take.
+    /// </summary>
+    private void DecideMove(BlockType belowBlockType, GameObject lowestHealthObject)
+    {
+        // If below block is of type Mulch, and the current health is less than (maxHealth - mulchHealthRecovery)
+        // we have a 20% chance that the ant will dig and feed from it.
+        if (belowBlockType == BlockType.Mulch && health < (maxHealth - mulchHealthRecovery))
+        {
+            float rand = Random.value;
+            if (rand < 0.2f)
+                Dig();
+            else
+                MoveToTarget(lowestHealthObject);
+        }
+        else
+            MoveToTarget(lowestHealthObject);
+    }
+
+    /// <summary>
+    /// * Considering the queen to also be an ant.
+    /// Checks if there are other ants on this position. If so, the ant with the highest health will donate health to the one with less health.
+    /// This action makes the ant get into an await state, having to wait for an amount of turns to be able to interact with other ants.
+    /// The ant will move randomly on this state.
+    /// </summary>
+    private void CheckPosition()
+    {
+        anotherOnSamePosition = false;
+
+        // has other gameobject on same position
+        foreach (GameObject ant in WorldManager.Instance.currentAnts)
+        {
+            // If on the same position
+            if (ant.transform.position == gameObject.transform.position && ant.name != gameObject.name)
+            {
+                anotherOnSamePosition = true;
+                Ant otherAntScript = ant.GetComponent<Ant>();
+                
+                // Share health with other ant in case the other ant has less remaining health.
+                if (otherAntScript.health < health)
+                {
+                    int randomHealthDonation = Random.Range(50, 100);
+                    otherAntScript.health += randomHealthDonation;
+                    otherAntScript.totalReceivedHealth += randomHealthDonation;
+                    totalGivenHealth += randomHealthDonation;
+                    health -= randomHealthDonation;
+
+                    // Will move randomly and not be able to give/receive health for 10 turns.
+                    awaitTurns = 10;
+                }
+            }
+        }
     }
 
     /// <summary>
     /// Method to update the ant's health per turn.
     /// </summary>
-    public void UpdateHealth()
+    public void UpdateHealth(BlockType belowBlockType)
     {
-        health -= maxDamage;
+        health -= turnDamage;
+
+        if (belowBlockType == BlockType.Acid)
+            health -= turnDamage;
+
+        if (health <= 0)
+        {
+            gameObject.SetActive(false);
+            WorldManager.Instance.currentQueen = null;
+        }
+    }
+
+    /// <summary>
+    /// Method to update await turns value, in case needed.
+    /// </summary>
+    public void UpdateAwaitTurns()
+    {
+        if (awaitTurns > 0)
+            awaitTurns--;
     }
 
     /// <summary>
@@ -124,59 +200,101 @@ public class Queen : MonoBehaviour
         float zDistance = targetObject.gameObject.transform.position.z - gameObject.transform.position.z;
         float zUpdate = zDistance >= 0 ? 1 : -1;
 
-        float currentHeight = GetPositionHeight(transform.position.x, transform.position.z);
-        if (xDistance > zDistance)
-        {
-            float targetHeight = GetPositionHeight(transform.position.x + xUpdate, transform.position.z);
-            float heightDifference = targetHeight - currentHeight;
-
-            if (heightDifference == 1.0f)
-                transform.position = transform.position + new Vector3(xUpdate, 1.0f, 0);
-            else if (heightDifference == -1.0f)
-                transform.position = transform.position + new Vector3(xUpdate, -1.0f, 0);
-            else if (heightDifference == 0.0f)
-                transform.position = transform.position + new Vector3(xUpdate, 0, 0);
-            else if (heightDifference >= 2.0f)
-            {
-                // Should place a stone block on the current position.
-                AbstractBlock block = new StoneBlock();
-                Vector3 oldPosition = transform.position;
-                transform.position = transform.position + new Vector3(0, 1.0f, 0);
-                PlaceBlock(oldPosition.x, oldPosition.y, oldPosition.z, block);
-            }
-            else if (heightDifference <= -2.0f)
-            {
-                // Should remove the below block, by replacing it with an air block.
-                AbstractBlock block = new AirBlock();
-                PlaceBlock(transform.position.x, transform.position.y - 1.0f, transform.position.z, block);
-                transform.position = transform.position + new Vector3(0, -1.0f, 0);
-            }
-        }
+        if (xDistance == 0)
+            MoveTowardsZ(zUpdate);
+        else if (zDistance == 0)
+            MoveTowardsX(xUpdate);
         else
         {
-            float targetHeight = GetPositionHeight(transform.position.x, transform.position.z + zUpdate);
-            float heightDifference = targetHeight - currentHeight;
+            // randomize if should go through X or Z on this step
+            float rand = Random.value;
+            if (rand < 0.5f)
+                MoveTowardsX(xUpdate);
+            else
+                MoveTowardsZ(zUpdate);
+        }
+    }
 
-            if (heightDifference == 1.0f)
-                transform.position = transform.position + new Vector3(0, 1.0f, zUpdate);
-            else if (heightDifference == -1.0f)
-                transform.position = transform.position + new Vector3(0, -1.0f, zUpdate);
-            else if (heightDifference == 0.0f)
-                transform.position = transform.position + new Vector3(0, 0, zUpdate);
-            else if (heightDifference >= 2.0f)
+    /// <summary>
+    /// Method to move towards the target through X.
+    /// </summary>
+    public void MoveTowardsX(float xUpdate)
+    {
+        float currentHeight = GetPositionHeight(transform.position.x, transform.position.z);
+        float targetHeight = GetPositionHeight(transform.position.x + xUpdate, transform.position.z);
+        float heightDifference = targetHeight - currentHeight;
+
+        if (heightDifference == 1.0f)
+            transform.position = transform.position + new Vector3(xUpdate, 1.0f, 0);
+        else if (heightDifference == -1.0f)
+            transform.position = transform.position + new Vector3(xUpdate, -1.0f, 0);
+        else if (heightDifference == 0.0f)
+            transform.position = transform.position + new Vector3(xUpdate, 0, 0);
+        else if (heightDifference >= 2.0f)
+            Climb();
+        else if (heightDifference <= -2.0f)
+            Dig();
+    }
+
+    /// <summary>
+    /// Method to move towards the target through Z.
+    /// </summary>
+    public void MoveTowardsZ(float zUpdate)
+    {
+        float currentHeight = GetPositionHeight(transform.position.x, transform.position.z);
+        float targetHeight = GetPositionHeight(transform.position.x, transform.position.z + zUpdate);
+        float heightDifference = targetHeight - currentHeight;
+
+        if (heightDifference == 1.0f)
+            transform.position = transform.position + new Vector3(0, 1.0f, zUpdate);
+        else if (heightDifference == -1.0f)
+            transform.position = transform.position + new Vector3(0, -1.0f, zUpdate);
+        else if (heightDifference == 0.0f)
+            transform.position = transform.position + new Vector3(0, 0, zUpdate);
+        else if (heightDifference >= 2.0f)
+            Climb();
+        else if (heightDifference <= -2.0f)
+            Dig();
+    }
+
+    /// <summary>
+    /// Climbing a placed block.
+    /// </summary>
+    public void Climb()
+    {
+        // Should place a stone block on the current position.
+        AbstractBlock block = new StoneBlock();
+        Vector3 oldPosition = transform.position;
+        transform.position = transform.position + new Vector3(0, 1.0f, 0);
+        PlaceBlock(oldPosition.x, oldPosition.y, oldPosition.z, block);
+    }
+    
+    /// <summary>
+    /// Digging on the current position.
+    /// </summary>
+    public void Dig()
+    {
+        BlockType belowBlockType = GetBelowBlockType();
+
+        // Will dig when below block is not container, and when there are no other ants on the same position.
+        if (belowBlockType != BlockType.Container && !anotherOnSamePosition)
+        {
+            // Should remove the below block, by replacing it with an air block.
+            AbstractBlock block = new AirBlock();
+            PlaceBlock(transform.position.x, transform.position.y - 1.0f, transform.position.z, block);
+            transform.position = transform.position + new Vector3(0, -1.0f, 0);
+
+            // Recovers health when digging mulch.
+            if (belowBlockType == BlockType.Mulch)
             {
-                // Should place a stone block on the current position.
-                AbstractBlock block = new StoneBlock();
-                Vector3 oldPosition = transform.position;
-                transform.position = transform.position + new Vector3(0, 1.0f, 0);
-                PlaceBlock(oldPosition.x, oldPosition.y, oldPosition.z, block);
-            }
-            else if (heightDifference <= -2.0f)
-            {
-                // Should remove the below block, by replacing it with an air block.
-                AbstractBlock block = new AirBlock();
-                PlaceBlock(transform.position.x, transform.position.y - 1.0f, transform.position.z, block);
-                transform.position = transform.position + new Vector3(0, -1.0f, 0);
+                health += mulchHealthRecovery;
+                totalMulchRecoveredHealth += mulchHealthRecovery;
+                // There is still a chance of eating when not needed.
+                if (health > maxHealth)
+                {
+                    health = maxHealth;
+                    totalMulchRecoveredHealth -= (health - maxHealth);
+                }
             }
         }
     }
@@ -192,28 +310,11 @@ public class Queen : MonoBehaviour
     }
     
     /// <summary>
-    /// Function to simulate a dig.
-    /// </summary>
-    private void Dig(int x, int y, int z, AbstractBlock block)
-    {
-        // WorldManager.Instance.SetBlock(x, y, z, block);
-    }
-
-    /// <summary>
     /// Function to place a block at a given coordinate.
     /// </summary>
     private void PlaceBlock(float x, float y, float z, AbstractBlock block)
     {
         WorldManager.Instance.SetBlock((int) x, (int) y, (int) z, block);
-    }
-
-    /// <summary>
-    /// Clear the move direction related arrays.
-    /// </summary>
-    public void ClearDirectionArrays()
-    {
-        possibleDirections.Clear();
-        possibleDirectionsHeightUpdate.Clear();
     }
 
     /// <summary>
@@ -226,24 +327,6 @@ public class Queen : MonoBehaviour
         return Mathf.Abs(transform.position.y - yPosition);
     }
     
-    /// <summary>
-    /// Method to move to a direction.
-    /// </summary>
-    public void MoveTo(int chosenDirectionIndex)
-    {
-        MoveDirections chosenDirection = possibleDirections[chosenDirectionIndex];
-        float yPositionUpdate = possibleDirectionsHeightUpdate[chosenDirectionIndex];
-
-        if (chosenDirection == MoveDirections.Left)
-            transform.position = GetPosition() + new Vector3(-1, yPositionUpdate, 0);
-        else if (chosenDirection == MoveDirections.Right)
-            transform.position = GetPosition() + new Vector3(1, yPositionUpdate, 0);
-        else if (chosenDirection == MoveDirections.Backward)
-            transform.position = GetPosition() + new Vector3(0, yPositionUpdate, -1);
-        else if (chosenDirection == MoveDirections.Forward)
-            transform.position = GetPosition() + new Vector3(0, yPositionUpdate, 1);
-    }
-
     /// <summary>
     /// Method to get the ant's current position.
     /// </summary>
@@ -261,9 +344,20 @@ public class Queen : MonoBehaviour
     }
 
     /// <summary>
+    /// Method to get the below block's type.
+    /// </summary>
+    private BlockType GetBelowBlockType()
+    {
+        Vector3 belowBlockPosition = GetBelowBlockPosition();
+        AbstractBlock belowBlock = WorldManager.Instance.GetBlock((int) belowBlockPosition.x, (int) belowBlockPosition.y, (int) belowBlockPosition.z);
+        BlockType belowBlockType = GetBlockType(belowBlock);
+        return belowBlockType;
+    }
+
+    /// <summary>
     /// Method to get the block's type.
     /// </summary>
-    private BlockType GetBelowBlockType(AbstractBlock block)
+    private BlockType GetBlockType(AbstractBlock block)
     {
         if (block is AcidicBlock)
             return BlockType.Acid;
@@ -272,6 +366,8 @@ public class Queen : MonoBehaviour
         else if (block is ContainerBlock)
             return BlockType.Container;
         else if (block is GrassBlock)
+            return BlockType.Grass;
+        else if (block is MulchBlock)
             return BlockType.Mulch;
         else if (block is NestBlock)
             return BlockType.Nest;

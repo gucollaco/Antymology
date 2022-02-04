@@ -729,6 +729,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fbd0fdbaf66dc1a4488d999aa299645f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  generation: 0
   turn: 0
   currentAnts: []
   currentQueen: {fileID: 0}
@@ -737,6 +738,9 @@ MonoBehaviour:
   queenPrefab: {fileID: 1407372792205191204, guid: 8f6668340329d0449a717b773fbf680a,
     type: 3}
   blockMaterial: {fileID: 2100000, guid: 4db9d8fce1a69b74f81daf1375c9ed88, type: 2}
+  textGeneration: {fileID: 1574905517}
+  textTurn: {fileID: 189366229}
+  textNestBlocks: {fileID: 937313466}
 --- !u!4 &964896558
 Transform:
   m_ObjectHideFlags: 0
@@ -772,7 +776,7 @@ MonoBehaviour:
   Acidic_Region_Radius: 5
   Number_Of_Conatiner_Spheres: 5
   Conatiner_Sphere_Radius: 10
-  InitialPopulation: 5
+  InitialPopulation: 20
 --- !u!850595691 &1337172883
 LightingSettings:
   m_ObjectHideFlags: 0

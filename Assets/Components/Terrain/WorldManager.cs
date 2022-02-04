@@ -3,12 +3,18 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using TMPro;
 
 namespace Antymology.Terrain
 {
     public class WorldManager : Singleton<WorldManager>
     {
         #region Fields
+
+        /// <summary>
+        /// The generation the simulation is at.
+        /// </summary>
+        public int generation;
 
         /// <summary>
         /// The turn the current generation is at.
@@ -39,6 +45,21 @@ namespace Antymology.Terrain
         /// The material used for eech block.
         /// </summary>
         public Material blockMaterial;
+
+        /// <summary>
+        /// The generation text.
+        /// </summary>
+        public TextMeshProUGUI textGeneration;
+
+        /// <summary>
+        /// The turn text.
+        /// </summary>
+        public TextMeshProUGUI textTurn;
+
+        /// <summary>
+        /// The nest blocks text.
+        /// </summary>
+        public TextMeshProUGUI textNestBlocks;
 
         /// <summary>
         /// The raw data of the underlying world structure.
@@ -115,7 +136,8 @@ namespace Antymology.Terrain
             // Initialize the currentAnts list.
             currentAnts = new List<GameObject>();
 
-            // Sets the turn to 0.
+            // Initializing some varialbes.
+            generation = 0;
             turn = 0;
         }
 
@@ -141,7 +163,8 @@ namespace Antymology.Terrain
             yield return StartCoroutine(GenerationCreation());
             yield return StartCoroutine(GenerationLiving());
 
-            StartCoroutine(SimulationLoop());
+            Debug.Log("Queen died");
+            // StartCoroutine(SimulationLoop());
         }
 
         /// <summary>
@@ -149,6 +172,8 @@ namespace Antymology.Terrain
         /// </summary>
         private IEnumerator GenerationCreation()
         {
+            generation++;
+
             GenerateData();
             GenerateChunks();
             GenerateQueen();
@@ -163,12 +188,46 @@ namespace Antymology.Terrain
         /// </summary>
         private IEnumerator GenerationLiving()
         {
-            while(true)
+            while(IsQueenAlive())
             {
                 turn++;
+                RemoveInactive();
                 AntsChooseAction();
+                UpdateTexts();
                 yield return actionWait;
             }
+        }
+
+        /// <summary>
+        /// Checks if the queen is alive.
+        /// </summary>
+        private bool IsQueenAlive()
+        {
+            Queen queenScript = currentQueen.GetComponent<Queen>();
+            return queenScript.health > 0;
+        }
+
+        /// <summary>
+        /// Update the texts being displayed.
+        /// </summary>
+        private void RemoveInactive()
+        {
+            foreach (GameObject ant in currentAnts.ToArray())
+            {
+                if (!ant.activeSelf)
+                    currentAnts.Remove(ant);
+            }
+        }
+
+        /// <summary>
+        /// Update the texts being displayed.
+        /// </summary>
+        private void UpdateTexts()
+        {
+            Queen queenScript = currentQueen.GetComponent<Queen>();
+            textGeneration.text = $"Generation: {generation}";
+            textTurn.text = $"Turn: {turn}";
+            textNestBlocks.text = $"Nest blocks: {queenScript.nestsProduced}";
         }
 
         /// <summary>
@@ -176,14 +235,41 @@ namespace Antymology.Terrain
         /// </summary>
         private void AntsChooseAction()
         {
-            Queen queenScript = currentQueen.GetComponent<Queen>();
-            queenScript.ChooseAction();
+            GameObject[] currentAntsArray = currentAnts.ToArray();
+            GameObject lowestHealthAnt = GetAntWithLowestHealth(currentAntsArray);
 
-            foreach (GameObject ant in currentAnts)
+            Queen queenScript = currentQueen.GetComponent<Queen>();
+            queenScript.ChooseAction(lowestHealthAnt);
+
+            foreach (GameObject ant in currentAntsArray)
             {
                 Ant antScript = ant.GetComponent<Ant>();
-                antScript.ChooseAction();
+                antScript.ChooseAction(lowestHealthAnt);
             }
+        }
+
+        /// <summary>
+        /// Method to get the ant with the lowest remaining health.
+        /// </summary>
+        public GameObject GetAntWithLowestHealth(GameObject[] currentAntsArray)
+        {
+            // Get the element with the lowest health compared to the total.
+            GameObject lowestHealthObject = null;
+            float lowestHealth = 10000;
+            
+            foreach (GameObject antObject in currentAntsArray)
+            {
+                Ant ant = antObject.GetComponent<Ant>();
+
+                float currentAntHealth = ant.health;
+                if (currentAntHealth < lowestHealth)
+                {
+                    lowestHealthObject = antObject;
+                    lowestHealth = currentAntHealth;
+                }
+            }
+
+            return lowestHealthObject;
         }
 
         /// <summary>

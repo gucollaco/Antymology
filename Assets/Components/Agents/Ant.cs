@@ -31,12 +31,17 @@ public class Ant : MonoBehaviour
     public int totalGivenHealth = 0;
     public int totalReceivedHealth = 0;
     public int totalMulchRecoveredHealth = 0;
+    public int awaitTurns = 0;
+    public bool anotherOnSamePosition = false;
 
     private int initialHealthOffset = 20;
     private int mulchHealthRecovery = 30;
     private int turnDamage = 5;
     private System.Random RNG;
     
+    /// <summary>
+    /// Start is called before the first frame update
+    /// </summary>
     void Start()
     {
         // Generate new random number generator
@@ -47,62 +52,158 @@ public class Ant : MonoBehaviour
     }
 
     /// <summary>
+    /// Method to get the element with the lowest remaining health.
+    /// </summary>
+    public GameObject GetElementWithLowestHealth(GameObject lowestHealthAnt)
+    {
+        bool isQueenTheLowest = false;
+
+        // Get the queen's health.
+        Queen queenScript = WorldManager.Instance.currentQueen.GetComponent<Queen>();
+        Ant antScript = lowestHealthAnt.GetComponent<Ant>();
+
+        // Check if the queen is the ant with the lowest remaining health.
+        isQueenTheLowest = queenScript.health < antScript.maxHealth;
+
+        // If this element is the one with lowest health, go to the queen.
+        // Or, if the queen is the element with the lowest health
+        if (gameObject.name == lowestHealthAnt.gameObject.name || isQueenTheLowest)
+            return WorldManager.Instance.currentQueen;
+        else
+            return lowestHealthAnt;
+    }
+    
+    /// <summary>
     /// Method to choose the ant's next action.
     /// </summary>
-    public void ChooseAction()
+    public void ChooseAction(GameObject lowestHealthAnt)
     {
-        Vector3 belowBlockPosition = GetBelowBlockPosition();
-        AbstractBlock belowBlock = WorldManager.Instance.GetBlock((int) belowBlockPosition.x, (int) belowBlockPosition.y, (int) belowBlockPosition.z);
-        BlockType belowBlockType = GetBlockType(belowBlock);
+        BlockType belowBlockType = GetBelowBlockType();
 
-        // Get the element with the lowest health compared to the total.
-        GameObject lowestHealthObject = WorldManager.Instance.currentQueen;
-        float lowestHealth = lowestHealthObject.GetComponent<Queen>().health / lowestHealthObject.GetComponent<Queen>().maxHealth;
-        
-        foreach (GameObject antObject in WorldManager.Instance.currentAnts)
+        Action(belowBlockType, lowestHealthAnt);
+        UpdateHealth(belowBlockType);
+        UpdateAwaitTurns();
+    }
+
+    /// <summary>
+    /// Will decide which action the ant should take.
+    /// </summary>
+    private void Action(BlockType belowBlockType, GameObject lowestHealthAnt)
+    {
+        // If haven't shared health recently, will move to the target.
+        if (awaitTurns == 0)
         {
-            Ant ant = antObject.GetComponent<Ant>();
-
-            float currentAntHealth = ant.health / ant.maxHealth;
-            if (currentAntHealth < lowestHealth)
-            {
-                lowestHealthObject = antObject;
-                lowestHealth = currentAntHealth;
-            }
+            GameObject lowestHealthObject = GetElementWithLowestHealth(lowestHealthAnt);
+            DecideMove(belowBlockType, lowestHealthObject);
+            CheckPosition();
         }
+        // If not, will move randomly.
+        else
+            MoveRandomly();
+    }
 
-        // If the element is the one with lowest health, go to the queen.
-        if (gameObject.name == lowestHealthObject.gameObject.name)
-        {
-            lowestHealthObject = WorldManager.Instance.currentQueen;
-            lowestHealth = lowestHealthObject.GetComponent<Queen>().health / lowestHealthObject.GetComponent<Queen>().maxHealth;
-        }
+    /// <summary>
+    /// To a random direction.
+    /// </summary>
+    private void MoveRandomly()
+    {
+        BlockType belowBlockType = GetBelowBlockType();
+        DecideRandomMove(belowBlockType);
+    }
 
+    /// <summary>
+    /// Decide which random move to take.
+    /// </summary>
+    private void DecideRandomMove(BlockType belowBlockType)
+    {
+        // Decide randomly which axis to travel through.
+        float randomAxis = Random.value;
+
+        // Decide randomly which direction (forward or backward) to go to in that axis.
+        float randomDirection = Random.value;
+        int directionUpdate = randomDirection > 0.5f ? 1 : -1;
+
+        if (randomAxis < 0.5f)
+            MoveTowardsZ(directionUpdate);
+        else
+            MoveTowardsX(directionUpdate);
+    }
+
+    /// <summary>
+    /// Decide which move to take.
+    /// </summary>
+    private void DecideMove(BlockType belowBlockType, GameObject lowestHealthObject)
+    {
+        if (anotherOnSamePosition)
+            MoveToTarget(lowestHealthObject);
         // If below block is of type Mulch, and the current health is less than (maxHealth - mulchHealthRecovery)
-        // we have a 60% chance that the ant will dig and feed from it.
-        if (belowBlockType == BlockType.Mulch && health < (maxHealth - mulchHealthRecovery))
+        // we have a 20% chance that the ant will dig and feed from it.
+        else if (belowBlockType == BlockType.Mulch && health < (maxHealth - mulchHealthRecovery))
         {
-            float rand = Random.Range(0, 5);
-            
-            if (rand <= 2)
+            float rand = Random.value;
+            if (rand < 0.2f)
                 Dig();
             else
                 MoveToTarget(lowestHealthObject);
         }
         else
             MoveToTarget(lowestHealthObject);
-
-        UpdateHealth(belowBlockType);
     }
 
     /// <summary>
-    /// Detecting collision.
+    /// Checks if there are other ants on this position. If so, the ant with the highest health will donate health to the one with less health.
+    /// This action makes the ant get into an await state, having to wait for an amount of turns to be able to interact with other ants.
+    /// The ant will move randomly on this state.
     /// </summary>
-    private void OnCollisionEnter(Collision other)
+    private void CheckPosition()
     {
-        Debug.Log(gameObject.name);
-        Debug.Log("COLLIDED WITH");
-        Debug.Log(other.gameObject.name);
+        anotherOnSamePosition = false;
+
+        // has other gameobject on same position
+        foreach (GameObject ant in WorldManager.Instance.currentAnts)
+        {
+            // If on the same position
+            if (ant.transform.position == gameObject.transform.position && ant.name != gameObject.name)
+            {
+                anotherOnSamePosition = true;
+                Ant otherAntScript = ant.GetComponent<Ant>();
+                
+                // Share health with other ant in case the other ant has less remaining health.
+                if (otherAntScript.health < health)
+                {
+                    // Debug.Log("Sharing health with an Ant");
+                    int randomHealthDonation = Random.Range(50, 100);
+                    otherAntScript.health += randomHealthDonation;
+                    otherAntScript.totalReceivedHealth += randomHealthDonation;
+                    totalGivenHealth += randomHealthDonation;
+                    health -= randomHealthDonation;
+
+                    // Will move randomly and not be able to give/receive health for 10 turns.
+                    awaitTurns = 10;
+                }
+            }
+        }
+
+        // Checks if the queen is on the same position as the ant.
+        if (WorldManager.Instance.currentQueen.transform.position == gameObject.transform.position)
+        {
+            anotherOnSamePosition = true;
+            Queen queenScript = WorldManager.Instance.currentQueen.GetComponent<Queen>();
+            
+            // Share health with other ant in case the other ant has less remaining health.
+            if (queenScript.health < health)
+            {
+                // Debug.Log("Sharing health with the Queen");
+                int randomHealthDonation = Random.Range(50, 100);
+                queenScript.health += randomHealthDonation;
+                queenScript.totalReceivedHealth += randomHealthDonation;
+                totalGivenHealth += randomHealthDonation;
+                health -= randomHealthDonation;
+
+                // Will move randomly and not be able to give/receive health for 10 turns.
+                awaitTurns = 10;
+            }
+        }
     }
 
     /// <summary>
@@ -117,6 +218,15 @@ public class Ant : MonoBehaviour
 
         if (health <= 0)
             gameObject.SetActive(false);
+    }
+
+    /// <summary>
+    /// Method to update await turns value, in case needed.
+    /// </summary>
+    public void UpdateAwaitTurns()
+    {
+        if (awaitTurns > 0)
+            awaitTurns--;
     }
 
     /// <summary>
@@ -136,9 +246,8 @@ public class Ant : MonoBehaviour
         else
         {
             // randomize if should go through X or Z on this step
-            float rand = Random.Range(0, 2);
-
-            if (rand == 0)
+            float rand = Random.value;
+            if (rand < 0.5f)
                 MoveTowardsX(xUpdate);
             else
                 MoveTowardsZ(zUpdate);
@@ -160,9 +269,9 @@ public class Ant : MonoBehaviour
             transform.position = transform.position + new Vector3(xUpdate, -1.0f, 0);
         else if (heightDifference == 0.0f)
             transform.position = transform.position + new Vector3(xUpdate, 0, 0);
-        else if (heightDifference >= 2.0f)
+        else if (heightDifference >= 2.0f && !anotherOnSamePosition)
             Climb();
-        else if (heightDifference <= -2.0f)
+        else if (heightDifference <= -2.0f && !anotherOnSamePosition)
             Dig();
     }
 
@@ -181,9 +290,9 @@ public class Ant : MonoBehaviour
             transform.position = transform.position + new Vector3(0, -1.0f, zUpdate);
         else if (heightDifference == 0.0f)
             transform.position = transform.position + new Vector3(0, 0, zUpdate);
-        else if (heightDifference >= 2.0f)
+        else if (heightDifference >= 2.0f && !anotherOnSamePosition)
             Climb();
-        else if (heightDifference <= -2.0f)
+        else if (heightDifference <= -2.0f && !anotherOnSamePosition)
             Dig();
     }
 
@@ -193,7 +302,7 @@ public class Ant : MonoBehaviour
     public void Climb()
     {
         // Should place a stone block on the current position.
-        AbstractBlock block = new MulchBlock();
+        AbstractBlock block = new StoneBlock();
         Vector3 oldPosition = transform.position;
         transform.position = transform.position + new Vector3(0, 1.0f, 0);
         PlaceBlock(oldPosition.x, oldPosition.y, oldPosition.z, block);
@@ -205,23 +314,26 @@ public class Ant : MonoBehaviour
     public void Dig()
     {
         BlockType belowBlockType = GetBelowBlockType();
-        if (belowBlockType != BlockType.Container)
+
+        // Will dig when below block is not container, and when there are no other ants on the same position.
+        if (belowBlockType != BlockType.Container && !anotherOnSamePosition)
         {
             // Should remove the below block, by replacing it with an air block.
             AbstractBlock block = new AirBlock();
             PlaceBlock(transform.position.x, transform.position.y - 1.0f, transform.position.z, block);
             transform.position = transform.position + new Vector3(0, -1.0f, 0);
-        }
-        // Recovers health when digging mulch.
-        if (belowBlockType == BlockType.Mulch)
-        {
-            health += mulchHealthRecovery;
-            totalMulchRecoveredHealth += mulchHealthRecovery;
-            // There is still a chance of eating when not needed.
-            if (health > maxHealth)
+
+            // Recovers health when digging mulch.
+            if (belowBlockType == BlockType.Mulch)
             {
-                health = maxHealth;
-                totalMulchRecoveredHealth -= (health - maxHealth);
+                health += mulchHealthRecovery;
+                totalMulchRecoveredHealth += mulchHealthRecovery;
+                // There is still a chance of eating when not needed.
+                if (health > maxHealth)
+                {
+                    health = maxHealth;
+                    totalMulchRecoveredHealth -= (health - maxHealth);
+                }
             }
         }
     }

@@ -175,10 +175,7 @@ public class Queen : MonoBehaviour
             health -= turnDamage;
 
         if (health <= 0)
-        {
             gameObject.SetActive(false);
-            WorldManager.Instance.currentQueen = null;
-        }
     }
 
     /// <summary>

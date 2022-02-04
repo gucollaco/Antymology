@@ -268,6 +268,9 @@ namespace Antymology.Terrain
                     lowestHealth = currentAntHealth;
                 }
             }
+            
+            // Debug.Log("lowestHealthObject");
+            // Debug.Log(lowestHealthObject.name);
 
             return lowestHealthObject;
         }

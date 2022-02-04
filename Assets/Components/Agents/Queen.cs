@@ -14,9 +14,10 @@ public class Queen : MonoBehaviour
     public int awaitTurns = 0;
     public bool anotherOnSamePosition = false;
     public int nestsProduced = 0;
+    public int daysForNestProduction = 75;
 
-    private int mulchHealthRecovery = 30;
-    private int turnDamage = 5;
+    private int mulchHealthRecovery = 40;
+    private int turnDamage = 6;
     private System.Random RNG;
     
     /// <summary>
@@ -48,10 +49,10 @@ public class Queen : MonoBehaviour
     /// </summary>
     private void Action(BlockType belowBlockType, GameObject lowestHealthAnt)
     {
-        bool isMultipleOfHundred = WorldManager.Instance.turn % 100 == 0;
+        bool hasNestProductionDaysPassed = WorldManager.Instance.turn % daysForNestProduction == 0;
 
-        // If 100 turns have passed, the queen produces a nest.
-        if (isMultipleOfHundred)
+        // If the expected amount of turns have passed, the queen produces a nest.
+        if (hasNestProductionDaysPassed)
             ProduceNest();
         // If haven't shared health recently, will move to the target.
         else if (awaitTurns == 0)
@@ -157,8 +158,8 @@ public class Queen : MonoBehaviour
                     totalGivenHealth += randomHealthDonation;
                     health -= randomHealthDonation;
 
-                    // Will move randomly and not be able to give/receive health for 10 turns.
-                    awaitTurns = 10;
+                    // Will move randomly and not be able to give/receive health for some turns.
+                    awaitTurns = 20;
                 }
             }
         }

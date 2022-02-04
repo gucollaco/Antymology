@@ -35,8 +35,8 @@ public class Ant : MonoBehaviour
     public bool anotherOnSamePosition = false;
 
     private int initialHealthOffset = 20;
-    private int mulchHealthRecovery = 30;
-    private int turnDamage = 5;
+    private int mulchHealthRecovery = 40;
+    private int turnDamage = 6;
     private System.Random RNG;
     
     /// <summary>
@@ -137,11 +137,11 @@ public class Ant : MonoBehaviour
         if (anotherOnSamePosition)
             MoveToTarget(lowestHealthObject);
         // If below block is of type Mulch, and the current health is less than (maxHealth - mulchHealthRecovery)
-        // we have a 20% chance that the ant will dig and feed from it.
+        // we have a some chance that the ant will dig and feed from it.
         else if (belowBlockType == BlockType.Mulch && health < (maxHealth - mulchHealthRecovery))
         {
             float rand = Random.value;
-            if (rand < 0.2f)
+            if (rand < 0.4f)
                 Dig();
             else
                 MoveToTarget(lowestHealthObject);
@@ -178,8 +178,8 @@ public class Ant : MonoBehaviour
                     totalGivenHealth += randomHealthDonation;
                     health -= randomHealthDonation;
 
-                    // Will move randomly and not be able to give/receive health for 10 turns.
-                    awaitTurns = 10;
+                    // Will move randomly and not be able to give/receive health for some turns.
+                    awaitTurns = 20;
                 }
             }
         }
@@ -200,8 +200,8 @@ public class Ant : MonoBehaviour
                 totalGivenHealth += randomHealthDonation;
                 health -= randomHealthDonation;
 
-                // Will move randomly and not be able to give/receive health for 10 turns.
-                awaitTurns = 10;
+                // Will move randomly and not be able to give/receive health for some turns.
+                awaitTurns = 20;
             }
         }
     }

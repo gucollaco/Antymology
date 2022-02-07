@@ -335,8 +335,8 @@ namespace Antymology.Terrain
         /// </summary>
         private void RemoveInactive()
         {
-            Debug.Log("CURRENT ANTS");
-            Debug.Log(currentAnts.ToArray().Length);
+            // Debug.Log("CURRENT ANTS");
+            // Debug.Log(currentAnts.ToArray().Length);
             foreach (GameObject ant in currentAnts.ToArray())
             {
                 if (!ant.activeSelf)

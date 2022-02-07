@@ -32,6 +32,11 @@ namespace Antymology.Terrain
         public GameObject currentQueen;
 
         /// <summary>
+        /// Current queen script.
+        /// </summary>
+        public Queen currentQueenScript;
+
+        /// <summary>
         /// The ant prefab.
         /// </summary>
         public GameObject antPrefab;
@@ -146,15 +151,99 @@ namespace Antymology.Terrain
         /// </summary>
         private void Start()
         {
-            GameObject antsParentElement = new GameObject("Ants");
-            antsParentTransform = antsParentElement.GetComponent<Transform>();
-            
             postCreationWait = new WaitForSeconds(postCreationWaitValue);
             actionWait = new WaitForSeconds(actionWaitValue);
 
-            StartCoroutine(SimulationLoop());
+            // Use this in case we want to run per routine control.
+            // StartCoroutine(SimulationLoop());
+
+            generation++;
+
+            GenerateData();
+            GenerateChunks();
+            GenerateAntParent();
+            GenerateQueen();
+            GenerateAnts();
+            CameraInitialSetup();
         }
 
+        /// <summary>
+        /// Generating the ant parent element.
+        /// </summary>
+        private void GenerateAntParent()
+        {
+            GameObject antsParentElement = new GameObject("Ants");
+            antsParentTransform = antsParentElement.GetComponent<Transform>();
+        }
+
+        /// <summary>
+        /// Called every 1s (configured at Edit > Settings > Time > Fixed Timestep).
+        /// </summary>
+        private void FixedUpdate()
+        {
+            turn++;
+            CheckGameEnd();
+        }
+
+        /// <summary>
+        /// Checking if game end conditions are met.
+        /// </summary>
+        private void CheckGameEnd()
+        {
+            if (currentQueenScript.health <= 0 || currentAnts.ToArray().Length == 0)
+            {
+                DestroyGeneration();
+                CreateNewGeneration();
+                // Debug.Log("NEW GEN");
+            }
+            else
+            {
+                // Debug.Log("UPDATE GEN");
+                RemoveInactive();
+                UpdateTexts();
+            }
+        }
+        
+        /// <summary>
+        /// Deleting an existing generation.
+        /// </summary>
+        private void DestroyGeneration()
+        {
+            // Destroying chunks
+            GameObject chunks = GameObject.Find("Chunks");
+            foreach (Transform child in chunks.transform) {
+                GameObject.Destroy(child.gameObject);
+            }
+            GameObject.Destroy(chunks);
+
+            // Destroying ants
+            GameObject ants = GameObject.Find("Ants");
+            foreach (Transform child in ants.transform) {
+                GameObject.Destroy(child.gameObject);
+            }
+            GameObject.Destroy(ants);
+
+            // Clearing controller variables.
+            currentAnts.Clear();
+            currentQueen = null;
+            currentQueenScript = null;
+        }
+
+        /// <summary>
+        /// Creating a new generation.
+        /// </summary>
+        private void CreateNewGeneration()
+        {
+            generation++;
+            turn = 0;
+
+            GenerateData();
+            GenerateChunks();
+            GenerateAntParent();
+            GenerateQueen();
+            GenerateAnts();
+        }
+        
         /// <summary>
         /// The simulation loop routine.
         /// </summary>
@@ -212,6 +301,8 @@ namespace Antymology.Terrain
         /// </summary>
         private void RemoveInactive()
         {
+            Debug.Log("CURRENT ANTS");
+            Debug.Log(currentAnts.ToArray().Length);
             foreach (GameObject ant in currentAnts.ToArray())
             {
                 if (!ant.activeSelf)
@@ -224,6 +315,8 @@ namespace Antymology.Terrain
         /// </summary>
         private void UpdateTexts()
         {
+            if (!currentQueen)
+                return;
             Queen queenScript = currentQueen.GetComponent<Queen>();
             textGeneration.text = $"Generation: {generation}";
             textTurn.text = $"Turn: {turn}";
@@ -306,6 +399,7 @@ namespace Antymology.Terrain
             currentQueen = GameObject.Instantiate(queenPrefab, spawnPosition, antPrefab.transform.rotation);
             currentQueen.name = "Queen";
             currentQueen.transform.SetParent(antsParentTransform);
+            currentQueenScript = currentQueen.GetComponent<Queen>();
         }
     
         /// <summary>

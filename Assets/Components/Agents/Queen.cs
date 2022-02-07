@@ -21,15 +21,30 @@ public class Queen : MonoBehaviour
     private System.Random RNG;
     
     /// <summary>
+    /// Awake method.
+    /// </summary>
+    void Awake()
+    {
+        // Setting initial health
+        health = initialHealth;
+    }
+
+    /// <summary>
     /// Start is called before the first frame update
     /// </summary>
     void Start()
     {
         // Generate new random number generator
         RNG = new System.Random(ConfigurationManager.Instance.Seed);
-        
-        // Setting initial health
-        health = initialHealth;
+    }
+
+    /// <summary>
+    /// Called every 1s (configured at Edit > Settings > Time > Fixed Timestep).
+    /// </summary>
+    private void FixedUpdate()
+    {
+        GameObject lowestHealthAnt = GetAntWithLowestHealth(WorldManager.Instance.currentAnts.ToArray());
+        ChooseAction(lowestHealthAnt);
     }
 
     /// <summary>
@@ -373,5 +388,32 @@ public class Queen : MonoBehaviour
             return BlockType.Stone;
         
         return BlockType.Abstract;
+    }
+    
+    /// <summary>
+    /// Method to get the ant with the lowest remaining health.
+    /// </summary>
+    public GameObject GetAntWithLowestHealth(GameObject[] currentAntsArray)
+    {
+        // Get the element with the lowest health compared to the total.
+        GameObject lowestHealthObject = null;
+        float lowestHealth = 10000;
+        
+        foreach (GameObject antObject in currentAntsArray)
+        {
+            Ant ant = antObject.GetComponent<Ant>();
+
+            float currentAntHealth = ant.health;
+            if (currentAntHealth < lowestHealth)
+            {
+                lowestHealthObject = antObject;
+                lowestHealth = currentAntHealth;
+            }
+        }
+        
+        // Debug.Log("lowestHealthObject");
+        // Debug.Log(lowestHealthObject.name);
+
+        return lowestHealthObject;
     }
 }

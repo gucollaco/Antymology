@@ -67,6 +67,26 @@ namespace Antymology.Terrain
         public TextMeshProUGUI textNestBlocks;
 
         /// <summary>
+        /// The max nest generation text.
+        /// </summary>
+        public TextMeshProUGUI textMaxNestGeneration;
+
+        /// <summary>
+        /// The max nest generation quantity text.
+        /// </summary>
+        public TextMeshProUGUI textMaxNestQuantity;
+
+        /// <summary>
+        /// The max nest generation.
+        /// </summary>
+        public int maxNestGeneration;
+
+        /// <summary>
+        /// The max nest generation quantity.
+        /// </summary>
+        public int maxNestGenerationQuantity;
+
+        /// <summary>
         /// The raw data of the underlying world structure.
         /// </summary>
         private AbstractBlock[,,] Blocks;
@@ -144,6 +164,8 @@ namespace Antymology.Terrain
             // Initializing some varialbes.
             generation = 0;
             turn = 0;
+            maxNestGenerationQuantity = -1;
+            maxNestGeneration = -1;
         }
 
         /// <summary>
@@ -192,9 +214,10 @@ namespace Antymology.Terrain
         {
             if (currentQueenScript.health <= 0 || currentAnts.ToArray().Length == 0)
             {
+                // Debug.Log("NEW GEN");
+                UpdateMaxGeneration();
                 DestroyGeneration();
                 CreateNewGeneration();
-                // Debug.Log("NEW GEN");
             }
             else
             {
@@ -204,6 +227,18 @@ namespace Antymology.Terrain
             }
         }
         
+        /// <summary>
+        /// Updates the max nest generation, in case the values are greater than a previous generation.
+        /// </summary>
+        private void UpdateMaxGeneration()
+        {
+            if (maxNestGenerationQuantity < currentQueenScript.nestsProduced)
+            {
+                maxNestGenerationQuantity = currentQueenScript.nestsProduced;
+                maxNestGeneration = generation;
+            }
+        }
+
         /// <summary>
         /// Deleting an existing generation.
         /// </summary>
@@ -222,11 +257,10 @@ namespace Antymology.Terrain
                 GameObject.Destroy(child.gameObject);
             }
             GameObject.Destroy(ants);
+            GameObject.Destroy(currentQueen);
 
             // Clearing controller variables.
             currentAnts.Clear();
-            currentQueen = null;
-            currentQueenScript = null;
         }
 
         /// <summary>
@@ -321,6 +355,12 @@ namespace Antymology.Terrain
             textGeneration.text = $"Generation: {generation}";
             textTurn.text = $"Turn: {turn}";
             textNestBlocks.text = $"Nest blocks: {queenScript.nestsProduced}";
+
+            if (maxNestGeneration >= 0)
+            {
+                textMaxNestGeneration.text = $"Max Nest Generation: {maxNestGeneration}";
+                textMaxNestQuantity.text = $"Max Nest Quantity: {maxNestGenerationQuantity}";
+            }
         }
 
         /// <summary>

@@ -289,8 +289,8 @@ public class Queen : MonoBehaviour
     {
         BlockType belowBlockType = GetBelowBlockType();
 
-        // Will dig when below block is not container, and when there are no other ants on the same position.
-        if (belowBlockType != BlockType.Container && !anotherOnSamePosition)
+        // Will dig when below block is not container/nest, and when there are no other ants on the same position.
+        if (belowBlockType != BlockType.Container && belowBlockType != BlockType.Nest && !anotherOnSamePosition)
         {
             // Should remove the below block, by replacing it with an air block.
             AbstractBlock block = new AirBlock();
